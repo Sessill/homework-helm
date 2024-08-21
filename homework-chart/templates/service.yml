@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: homework-service
+spec:
+  selector:
+    app: homework-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+      
