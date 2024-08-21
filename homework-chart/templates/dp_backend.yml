@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework-deployment
+  labels:
+    app: homework-service
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+       app: homework-service
+  template:
+    metadata:
+      labels:
+        app: homework-service
+    spec:
+      serviceAccountName: {{ include "homework-chart.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.backend.image.name }}"
+          ports:
+          - containerPort: {{ .Values.backend.container.ports.containerPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.backend.container.configmapName }}
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.container.env.secretName }}
+                  key: {{ .Values.backend.container.env.SPRING_DATASOURCE_USERNAME }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.container.env.secretName }}
+                  key: {{ .Values.backend.container.env.SPRING_DATASOURCE_PASSWORD }}
+            - name:  DB_HOST
+              value: {{ .Values.backend.container.env.DB_HOST }}
+#        readinessProbe:
+#          httpGet:
+#            path: /health
+#            port: 8000
+#          initialDelaySeconds: 5
+#          periodSeconds: 10
+#        livenessProbe:
+#          httpGet:
+#            path: /health
+#            port: 8000
+#          initialDelaySeconds: 15
+#          periodSeconds: 20
+        {{- with .Values.backend.volumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+      {{- with .Values.backend.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
