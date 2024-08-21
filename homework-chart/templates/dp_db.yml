@@ -1,0 +1,48 @@
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres-service
+spec:
+  replicas: {{ .Values.db.replicas }}
+  selector:
+    matchLabels:
+       app: postgres-service
+  template:
+    metadata:
+      labels:
+        app: postgres-service
+    spec:
+      serviceAccountName: {{ include "homework-chart.serviceAccountName" . }}
+      containers:
+        - name: postgres-service #{{ .Chart.Name }}
+          image: "{{ .Values.db.image.name }}"
+          ports:
+          - containerPort: {{ .Values.db.container.ports.containerPort }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.db.env.POSTGRES_DB }}
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db.env.secretName }}
+                  key: {{ .Values.db.env.POSTGRES_USER }}
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db.env.secretName }}
+                  key: {{ .Values.db.env.POSTGRES_PASSWORD }}
+
+          
+          volumeMounts:
+            {{- toYaml .Values.db.volumeMounts | nindent 12 }}
+            
+        
+      volumes:
+        {{- toYaml .Values.db.volumes | nindent 8 }}
+      
