@@ -1,0 +1,207 @@
+backend:
+  deployment:
+    name: homework-deployment
+    replicas: 3
+  container:
+    name: homework-service
+    resources: 
+#      limits:
+#        memory: 1024Mi
+#        cpu: 500m
+#      requests:
+#        memory: 512Mi
+#        cpu: 100m
+    volumes: 
+      - name: application-yml
+        configMap:
+          name: homework-config
+      - name: secret-volume
+        secret:
+          secretName: datasource-credentials
+
+    volumeMounts: 
+      - name: application-yml
+        mountPath: /etc/config/application.yml
+      - name: secret-volume
+        mountPath: /etc/secret
+    ports:
+      containerPort: 8000
+#        readinessProbe:
+#          httpGet:
+#            path: /health
+#            port: 8000
+#          initialDelaySeconds: 5
+#          periodSeconds: 10
+#        livenessProbe:
+#          httpGet:
+#            path: /health
+#            port: 8000
+#          initialDelaySeconds: 15
+#          periodSeconds: 20
+    configmapName: homework-config
+    env:
+      SPRING_DATASOURCE_USERNAME: username
+      SPRING_DATASOURCE_PASSWORD: password
+      DB_HOST: http://postgres-service.default.svc.cluster.local:5432
+      secretName: datasource-credentials
+      
+  service:
+    name: homework-service
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  image:
+    name: sessill/homework-helm:latest
+    tag: latest
+    pullPolicy: IfNotPresent
+  configMap:
+    name: homework-config
+    data: |
+     logging:
+      level:
+          org:
+              hibernate:
+                    type:
+                      descriptor:
+                          sql: trace
+      pattern:
+          console: '%C{1.} [%-5level] %d{HH:mm:ss} - %msg%n.'
+     server:
+      port: 8000
+     spring:
+      application:
+          name: homework-docker
+      datasource:
+          password: ${SPRING_DATASOURCE_PASSWORD}
+          url: jdbc:postgresql://postgres-service.default.svc.cluster.local:5432/homework
+          username: ${SPRING_DATASOURCE_USERNAME}
+      jpa:
+          properties:
+              hibernate:
+                  format_sql: true
+          show-sql: true
+     postgres:
+      db:
+        name: homework
+      service:
+        name: postgres-service
+    
+    
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations: {}
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: arch.homework
+        paths:
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: homework-service
+                port:
+                  number: 8765
+
+
+db:
+  deployment:
+    name:
+    replicas: 3
+  container:
+    name:
+    ports:
+      containerPort: 5432
+    resources: {}
+#      limits:
+#        memory: 1024Mi
+#        cpu: 500m
+#      requests:
+#        memory: 512Mi
+#        cpu: 100m
+  image:
+    name: postgres:16.3-alpine3.20
+#    tag: latest
+    pullPolicy: IfNotPresent
+  volumes:
+    - name: sql-config
+      configMap:
+        name: sql-configmap
+
+    - name: db-data
+      persistentVolumeClaim:
+        claimName: postgres-pvc
+  volumeMounts: 
+    - mountPath: /var/lib/postgresql/data
+      name: db-data
+
+    - mountPath: /docker-entrypoint-initdb.d
+      name: sql-config
+  env:
+    POSTGRES_DB: homework
+    POSTGRES_USER: username
+    POSTGRES_PASSWORD: password
+    secretName: datasource-credentials    
+  service:
+    name: postgres-service
+    port: 5432
+    targetPort: 5432
+    type: ClusterIP
+  configMap:
+    data:
+  initdb.sql: |
+
+    
+    CREATE SCHEMA IF NOT EXISTS otus
+      AUTHORIZATION postgres;
+    
+    CREATE TABLE IF NOT EXISTS otus.user_data
+    (
+      id bigint NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 ),
+      username text COLLATE pg_catalog."default" NOT NULL,
+      firstname text COLLATE pg_catalog."default" NOT NULL,
+      lastname text COLLATE pg_catalog."default" NOT NULL,
+      email text COLLATE pg_catalog."default" NOT NULL,
+      phone text COLLATE pg_catalog."default" NOT NULL,
+      CONSTRAINT user_data_pkey PRIMARY KEY (id)
+    )
+
+    TABLESPACE pg_default;
+
+    ALTER TABLE IF EXISTS otus.user_data
+      OWNER to postgres;
+
+
+
+persistence:
+  name: pv001
+  storageClass: "my-local-sc"
+  persistentVolumeReclaimPolicy: Retain
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 2Gi
+  volumeMode: Filesystem
+  path: "/mnt/local-storage"
+
+persistentVolumeClaim:
+  name: postgres-pvc
+  accessMode: ReadWriteOnce
+  size: 512Mi
+  volumeMode: Filesystem
+
+secrets:
+  username: cG9zdGdyZXM=
+  password: Z21CaDNhYw==
+
+serviceAccount:
+  create: true
+  name:
+  
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+  
