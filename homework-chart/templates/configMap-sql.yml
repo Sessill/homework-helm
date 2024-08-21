@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sql-configmap
+  labels:
+    {{- include "homework-chart.labels" . | nindent 4 }}
+data:
+  initdb.sql: |
+
+    
+    CREATE SCHEMA IF NOT EXISTS otus
+      AUTHORIZATION postgres;
+    
+    CREATE TABLE IF NOT EXISTS otus.user_data
+    (
+      id bigint NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 ),
+      username text COLLATE pg_catalog."default" NOT NULL,
+      firstname text COLLATE pg_catalog."default" NOT NULL,
+      lastname text COLLATE pg_catalog."default" NOT NULL,
+      email text COLLATE pg_catalog."default" NOT NULL,
+      phone text COLLATE pg_catalog."default" NOT NULL,
+      CONSTRAINT user_data_pkey PRIMARY KEY (id)
+    )
+
+    TABLESPACE pg_default;
+
+    ALTER TABLE IF EXISTS otus.user_data
+      OWNER to postgres;
